@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MaxxedCompass" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <style name="Theme.MaxxedCompass.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/compass_splash_bg_light</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_compass_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MaxxedCompass</item>
+    </style>
+</resources>
