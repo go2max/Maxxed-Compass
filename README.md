@@ -1,58 +1,55 @@
-# MaxxedCompass
+# Maxxed Compass
 
-## Current Status
+Maxxed Compass is an offline Android compass, trip tracker, and calculated sky guide. The functional baseline is commit `4011abc7d169e36b48ac78bceeb7d25f246b370b`.
 
-This is a standalone Android Studio project that currently builds a debug APK and opens to a basic Compose screen. It is not yet feature-complete relative to the same-day task brief.
+## Implemented
 
-## Build
+- Rotation-vector compass with accelerometer/magnetometer fallback
+- Magnetic and true-north headings with geomagnetic declination
+- Calibration and magnetic-interference status
+- Foreground trip tracking with pause, resume, stop, segments, and local history
+- DataStore persistence and active-trip process recovery
+- Lock-screen display flags and optional keep-screen-on mode
+- Offline Sky Scanner with all 88 selectable constellations enabled by default, dots/lines, red map, camera preview, and search
+- Metric/imperial units, themes, night mode, and advanced tools
+
+All trip, setting, location, camera, and sensor processing stays on the device. The app does not request Internet access.
+
+## Debug Verification
 
 ```bash
-./gradlew testDebugUnitTest
-./gradlew lintDebug
-./gradlew assembleDebug
+./gradlew clean testDebugUnitTest lintDebug assembleDebug
 ```
 
-## Build APK For Individual Testing
-
-```bash
-./gradlew assembleDebug
-open app/build/outputs/apk/debug/
-```
-
-Primary test artifact:
-
-- `app/build/outputs/apk/debug/app-debug.apk`
-
-## Install
+Install on a connected device:
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Current Permissions
+## Signed Release
 
-- None requested yet
+Create an ignored properties file outside the repository:
 
-## Verified in This Session
+```properties
+storeFile=/absolute/path/to/upload-key.jks
+storePassword=REDACTED
+keyAlias=upload
+keyPassword=REDACTED
+```
 
-- `testDebugUnitTest` passed
-- `lintDebug` passed
-- `assembleDebug` passed
-- Individual debug APK was built for direct install/testing
-- Debug APK copied to `../Deliverables/MaxxedCompass-debug.apk`
+Build and verify:
 
-## Current Workflow
+```bash
+export MAXXED_RELEASE_PROPERTIES=/absolute/path/to/release.properties
+./gradlew clean testDebugUnitTest lintRelease assembleRelease bundleRelease
+chmod +x scripts/verify-release.sh
+MAXXED_EXPECTED_CERT_SHA256=YOUR_EXPECTED_CERT_DIGEST \
+  scripts/verify-release.sh
+```
 
-- Launches into a Compose-based placeholder home screen
+The verifier checks APK and AAB signatures, compares the APK signer when an expected digest is supplied, rejects a debuggable release APK, and writes SHA-256 hashes under `release/verification/`.
 
-## Major Limitations
+## Release Status
 
-- No compass sensor flow yet
-- No trip tracking yet
-- No lock-screen flow yet
-- No sky preview yet
-- No persistence, settings, unit conversion, or manual device validation yet
-
-## Next Release Step
-
-Implement the real compass heading pipeline, trip model, persistence, and offline sky preview before claiming acceptance against the task brief.
+See `RELEASE_READINESS.json` for the machine-readable status and `docs/PHYSICAL_TEST_PLAN.md` for the required Samsung S22 Ultra acceptance run. A release is not READY until every pending physical and artifact check has recorded evidence.

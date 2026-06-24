@@ -1,0 +1,59 @@
+{
+  "project": "Maxxed Compass",
+  "baseline_commit": "4011abc7d169e36b48ac78bceeb7d25f246b370b",
+  "evaluated_on": "2026-06-23",
+  "overall_status": "NOT_READY",
+  "source": {
+    "kotlin_warning_cleanup": "implemented_not_compiled_in_current_runner",
+    "process_recovery_hardening": "implemented_not_device_verified",
+    "all_88_selectable_constellations": "implemented_not_compiled_or_device_verified",
+    "constellation_catalog_unique_ids": "verified_88_in_bundled_json",
+    "release_debug_key_fallback": "removed",
+    "unit_tests": "not_run_no_android_sdk_or_gradle_distribution",
+    "lint_release": "not_run_no_android_sdk_or_gradle_distribution"
+  },
+  "physical_tests": {
+    "heading_accuracy": "not_run",
+    "true_north": "not_run",
+    "trip_tracking": "not_run",
+    "notification_actions": "not_run",
+    "process_recovery": "not_run",
+    "lock_screen_display": "not_run",
+    "sky_scanner": "not_run",
+    "outdoor_distance_10_to_20_minutes": "not_run",
+    "outdoor_battery_10_to_20_minutes": "not_run"
+  },
+  "release_artifacts": {
+    "signed_apk": "not_built",
+    "signed_aab": "not_built",
+    "apk_sha256": null,
+    "aab_sha256": null,
+    "apk_signer_sha256": null,
+    "expected_signer_match": "not_run",
+    "aab_signature": "not_run",
+    "non_debuggable_manifest": "not_run"
+  },
+  "publication": {
+    "implementation_commit": "not_created",
+    "release_finalization_commit": "not_created",
+    "push_to_main": "failed_read_only_github_integration"
+  },
+  "privacy_and_store": {
+    "privacy_disclosure": "drafted",
+    "play_data_safety": "drafted_not_console_verified",
+    "no_internet_permission": "verified_in_source_manifest",
+    "store_listing": "drafted",
+    "privacy_policy_url": "missing",
+    "support_email": "missing",
+    "feature_graphic": "not_verified",
+    "screenshots": "not_verified"
+  },
+  "exact_release_failures": [
+    "The current runner has no Android SDK and cannot download Gradle 8.9 because the distribution request returns HTTP 403.",
+    "No Samsung S22 Ultra or adb executable is available to this runner, so required physical tests were not executed.",
+    "No release keystore or expected certificate digest was provided to this runner, so signed APK/AAB artifacts and signer identity were not verified.",
+    "A public privacy-policy URL, confirmed support email, feature graphic, and signed-release screenshots are not verified.",
+    "GitHub rejected repository-content writes with HTTP 403 Resource not accessible by integration, so the requested commits were not pushed."
+  ],
+  "ready_when": "All source checks compile and pass, every physical test is pass with evidence, signed APK/AAB verification passes against the expected certificate, hashes are recorded, and privacy/store materials are complete."
+}
