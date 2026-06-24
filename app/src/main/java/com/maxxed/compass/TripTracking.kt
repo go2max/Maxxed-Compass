@@ -133,11 +133,15 @@ class TrackingService : Service(), LocationListener {
             ACTION_START -> {
                 TrackingRepository.setState(TrackingState.ACTIVE)
                 startForeground(NOTIFICATION_ID, buildNotification(TrackingState.ACTIVE))
-                beginUpdates()
+                startOrRestoreTrip()
             }
             ACTION_PAUSE -> pauseTrip()
-            ACTION_RESUME -> resumeTrip()
+            ACTION_RESUME -> {
+                startForeground(NOTIFICATION_ID, buildNotification(TrackingState.ACTIVE))
+                resumeTrip()
+            }
             ACTION_STOP -> stopTrip()
+            else -> restoreAfterProcessDeath()
         }
         return START_STICKY
     }
@@ -165,7 +169,7 @@ class TrackingService : Service(), LocationListener {
         persist()
     }
 
-    private fun beginUpdates() {
+    private fun startOrRestoreTrip() {
         scope.launch {
             activeTrip = storage.activeTripFlow.mapLatestOnce() ?: TripRecord(
                 name = "Trip ${System.currentTimeMillis()}",
@@ -173,8 +177,17 @@ class TrackingService : Service(), LocationListener {
                 startedAtMillis = System.currentTimeMillis(),
                 segments = listOf(TripSegment(name = "Segment 1", startedAtMillis = System.currentTimeMillis()))
             )
-            persist()
+            storage.saveActiveTrip(requireNotNull(activeTrip))
+            if (activeTrip?.paused == true) {
+                TrackingRepository.setState(TrackingState.PAUSED)
+                startForeground(NOTIFICATION_ID, buildNotification(TrackingState.PAUSED))
+            } else {
+                beginLocationUpdates()
+            }
         }
+    }
+
+    private fun beginLocationUpdates() {
         val provider = when {
             locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
@@ -193,41 +206,67 @@ class TrackingService : Service(), LocationListener {
     }
 
     private fun pauseTrip() {
-        val trip = activeTrip ?: return
-        activeTrip = trip.copy(paused = true, pauseStartedAtMillis = System.currentTimeMillis())
-        TrackingRepository.setState(TrackingState.PAUSED)
-        locationManager.removeUpdates(this)
-        startForeground(NOTIFICATION_ID, buildNotification(TrackingState.PAUSED))
-        persist()
+        scope.launch {
+            val trip = activeTrip ?: storage.activeTripFlow.mapLatestOnce() ?: return@launch
+            activeTrip = trip.copy(paused = true, pauseStartedAtMillis = System.currentTimeMillis())
+            TrackingRepository.setState(TrackingState.PAUSED)
+            locationManager.removeUpdates(this@TrackingService)
+            startForeground(NOTIFICATION_ID, buildNotification(TrackingState.PAUSED))
+            storage.saveActiveTrip(requireNotNull(activeTrip))
+        }
     }
 
     private fun resumeTrip() {
-        val trip = activeTrip ?: return
-        val pausedFor = trip.pauseStartedAtMillis?.let { System.currentTimeMillis() - it } ?: 0L
-        activeTrip = trip.copy(
-            paused = false,
-            pauseStartedAtMillis = null,
-            totalPausedMillis = trip.totalPausedMillis + pausedFor
-        )
-        TrackingRepository.setState(TrackingState.ACTIVE)
-        startForeground(NOTIFICATION_ID, buildNotification(TrackingState.ACTIVE))
-        beginUpdates()
+        scope.launch {
+            val trip = activeTrip ?: storage.activeTripFlow.mapLatestOnce() ?: run {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+            val pausedFor = trip.pauseStartedAtMillis?.let { System.currentTimeMillis() - it } ?: 0L
+            activeTrip = trip.copy(
+                paused = false,
+                pauseStartedAtMillis = null,
+                totalPausedMillis = trip.totalPausedMillis + pausedFor
+            )
+            TrackingRepository.setState(TrackingState.ACTIVE)
+            storage.saveActiveTrip(requireNotNull(activeTrip))
+            beginLocationUpdates()
+        }
     }
 
     private fun stopTrip() {
-        val trip = activeTrip
-        TrackingRepository.setState(TrackingState.IDLE)
-        locationManager.removeUpdates(this)
         scope.launch {
+            val trip = activeTrip ?: storage.activeTripFlow.mapLatestOnce()
+            TrackingRepository.setState(TrackingState.IDLE)
+            locationManager.removeUpdates(this@TrackingService)
             if (trip != null) {
                 val completed = trip.copy(endedAtMillis = System.currentTimeMillis(), paused = false, pauseStartedAtMillis = null)
                 val history = storage.historyFlow.mapLatestOnce()
                 storage.saveHistory(listOf(completed) + history)
                 storage.saveActiveTrip(null)
             }
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+    }
+
+    private fun restoreAfterProcessDeath() {
+        startForeground(NOTIFICATION_ID, buildNotification(TrackingState.ACTIVE))
+        scope.launch {
+            val trip = storage.activeTripFlow.mapLatestOnce()
+            if (trip == null) {
+                TrackingRepository.setState(TrackingState.IDLE)
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+            activeTrip = trip
+            val state = if (trip.paused) TrackingState.PAUSED else TrackingState.ACTIVE
+            TrackingRepository.setState(state)
+            startForeground(NOTIFICATION_ID, buildNotification(state))
+            if (!trip.paused) beginLocationUpdates()
+        }
     }
 
     private fun persist() {

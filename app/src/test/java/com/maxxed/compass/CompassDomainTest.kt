@@ -113,4 +113,33 @@ class CompassDomainTest {
         val nearest = SkyMath.nearestToCenter(objects, 0.0, 40.0)
         assertNotNull(nearest)
     }
+
+    @Test
+    fun constellationCatalogMergesSplitFiguresAndBuildsLines() {
+        val namesJson = """{"features":[
+            {"id":"Ori","properties":{"name":"Orion"}},
+            {"id":"Ser","properties":{"name":"Serpens Caput"}}
+        ]}"""
+        val linesJson = """{"features":[
+            {"id":"Ori","geometry":{"coordinates":[[[85.1,60.0],[84.0,61.0],[83.0,62.0]]]}},
+            {"id":"Ser","geometry":{"coordinates":[[[-123.4,15.4],[-124.6,19.6]]]}},
+            {"id":"Ser","geometry":{"coordinates":[[[-102.4,-15.7],[-95.6,-15.3]]]}}
+        ]}"""
+        val catalog = ConstellationCatalog.parse(linesJson, namesJson)
+        assertEquals(2, catalog.size)
+        assertEquals("Serpens", catalog.first { it.id == "Ser" }.name)
+        assertEquals(2, catalog.first { it.id == "Ser" }.polylines.size)
+
+        val overlays = SkyMath.constellationOverlays(
+            constellations = catalog,
+            timeMillis = 1_704_067_200_000L,
+            latitude = 38.5816,
+            longitude = -121.4944
+        )
+        val orion = overlays.firstOrNull { it.id == "Ori" }
+        assertNotNull(orion)
+        assertEquals(3, orion!!.points.size)
+        assertEquals(2, orion.lines.size)
+        assertTrue(orion.points.all { it.azimuthDegrees in 0.0..360.0 })
+    }
 }

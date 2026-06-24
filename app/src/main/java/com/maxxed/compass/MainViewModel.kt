@@ -23,12 +23,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application), L
     private val storage = AppStorage(appContext)
     private val sensorController = CompassSensorController(appContext)
     private val locationManager = appContext.getSystemService(LocationManager::class.java)
+    private val constellationCatalog = ConstellationCatalog.load(appContext)
+    private val constellationOptions = constellationCatalog.map { ConstellationOption(it.id, it.name) }
     private val headingFlow = MutableStateFlow(HeadingSample())
     private val currentPointFlow = MutableStateFlow<TripPoint?>(null)
-    private val skyFlow = MutableStateFlow(SkyUiState())
+    private val skyFlow = MutableStateFlow(
+        SkyUiState(
+            constellationOptions = constellationOptions,
+            enabledConstellationIds = constellationCatalog.mapTo(linkedSetOf()) { it.id }
+        )
+    )
     private val promptFlow = MutableStateFlow<PermissionPrompt?>(null)
     private val selectionFlow = MutableStateFlow<String?>(null)
     private var sensorJob: Job? = null
+    private var startTripAfterNotificationPermission = false
+    private var lastSkyUpdateMillis = 0L
 
     val uiState: StateFlow<CompassUiState> = combine(
         combine(storage.settingsFlow, storage.activeTripFlow, storage.historyFlow) { settings, activeTrip, history ->
@@ -98,7 +107,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), L
                     declinationDegrees = declination,
                     fieldStrengthMicroTesla = reading.fieldStrengthMicroTesla
                 )
-                updateSky()
+                updateSkyIfDue()
             }
         }
     }
@@ -156,6 +165,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application), L
     fun clearPermissionPrompt() { promptFlow.value = null }
     fun selectTrip(id: String?) { selectionFlow.value = id }
     fun setSkySearch(query: String) { skyFlow.value = skyFlow.value.copy(searchQuery = query); updateSky() }
+    fun setConstellationEnabled(id: String, enabled: Boolean) {
+        val settings = uiState.value.settings
+        val hidden = settings.hiddenConstellationIds.toMutableSet().apply {
+            if (enabled) remove(id) else add(id)
+        }
+        saveConstellationSelection(settings.copy(hiddenConstellationIds = hidden))
+    }
+
+    fun setAllConstellationsEnabled(enabled: Boolean) {
+        val settings = uiState.value.settings
+        val hidden = if (enabled) emptySet() else constellationCatalog.mapTo(linkedSetOf()) { it.id }
+        saveConstellationSelection(settings.copy(hiddenConstellationIds = hidden))
+    }
     fun setCameraMode(enabled: Boolean) {
         if (enabled && !hasPermission(Manifest.permission.CAMERA)) {
             promptFlow.value = PermissionPrompt.CAMERA
@@ -169,6 +191,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application), L
             promptFlow.value = PermissionPrompt.LOCATION
             return
         }
+        if (Build.VERSION.SDK_INT >= 33 && !hasPermission(Manifest.permission.POST_NOTIFICATIONS)) {
+            startTripAfterNotificationPermission = true
+            promptFlow.value = PermissionPrompt.NOTIFICATIONS
+            return
+        }
+        startTrackingService()
+    }
+
+    fun onNotificationPermissionResult(granted: Boolean) {
+        promptFlow.value = null
+        val shouldStart = startTripAfterNotificationPermission
+        startTripAfterNotificationPermission = false
+        if (granted && shouldStart) startTrackingService()
+    }
+
+    private fun startTrackingService() {
         ContextCompat.startForegroundService(appContext, TrackingService.intent(appContext, TrackingService.ACTION_START))
         TrackingRepository.setState(TrackingState.ACTIVE)
     }
@@ -217,20 +255,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application), L
         viewModelScope.launch { storage.clearAll() }
     }
 
-    private fun updateSky() {
+    private fun saveConstellationSelection(settings: AppSettings) {
+        viewModelScope.launch { storage.saveSettings(settings) }
+        updateSky(settings.hiddenConstellationIds)
+    }
+
+    private fun updateSkyIfDue() {
+        val now = System.currentTimeMillis()
+        if (now - lastSkyUpdateMillis < 1_000L) return
+        lastSkyUpdateMillis = now
+        updateSky()
+    }
+
+    private fun updateSky(hiddenConstellationIds: Set<String> = uiState.value.settings.hiddenConstellationIds) {
+        lastSkyUpdateMillis = System.currentTimeMillis()
+        val enabledConstellations = constellationCatalog.filterNot { it.id in hiddenConstellationIds }
+        skyFlow.value = skyFlow.value.copy(
+            constellationOptions = constellationOptions,
+            enabledConstellationIds = enabledConstellations.mapTo(linkedSetOf()) { it.id }
+        )
         val point = currentPointFlow.value
         val heading = headingFlow.value.magneticHeading
         if (point == null || heading == null) {
             skyFlow.value = skyFlow.value.copy(status = "Location and compass needed for sky overlay.")
             return
         }
-        val objects = SkyMath.visibleObjects(System.currentTimeMillis(), point.latitude, point.longitude)
+        val objects = SkyMath.visibleObjects(
+            System.currentTimeMillis(),
+            point.latitude,
+            point.longitude,
+            enabledConstellations
+        )
             .filter { it.altitudeDegrees > if (uiState.value.settings.advancedMode) -5 else 0 }
             .filter { skyFlow.value.searchQuery.isBlank() || it.name.contains(skyFlow.value.searchQuery, ignoreCase = true) }
+        val constellationOverlays = SkyMath.constellationOverlays(
+            enabledConstellations,
+            System.currentTimeMillis(),
+            point.latitude,
+            point.longitude
+        )
+            .filter { overlay ->
+                skyFlow.value.searchQuery.isBlank() ||
+                    overlay.name.contains(skyFlow.value.searchQuery, ignoreCase = true)
+            }
         val nearest = SkyMath.nearestToCenter(objects, heading.toDouble(), 35.0)
         skyFlow.value = skyFlow.value.copy(
             nearestObject = nearest,
             visibleObjects = objects.take(20),
+            constellationOverlays = constellationOverlays,
             status = nearest?.let { "${it.name} nearest center target. ${SkyMath.polarisGuidance(objects)}" }
                 ?: "No supported object near the center target."
         )

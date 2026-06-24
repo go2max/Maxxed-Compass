@@ -1,7 +1,7 @@
 package com.maxxed.compass
 
 import android.Manifest
-import android.content.pm.PackageManager
+import android.graphics.Paint as AndroidPaint
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -34,16 +34,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.NightsStay
 import androidx.compose.material.icons.outlined.Pause
@@ -57,6 +53,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,9 +79,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -119,14 +116,14 @@ class MainActivity : ComponentActivity() {
             }
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()
-            ) { viewModel.clearPermissionPrompt() }
+            ) { granted -> viewModel.onNotificationPermissionResult(granted) }
 
             LaunchedEffect(Unit) {
+                @Suppress("DEPRECATION")
                 val displayRotation =
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                         display?.rotation ?: android.view.Surface.ROTATION_0
                     } else {
-                        ("DEPRECATION")
                         windowManager.defaultDisplay.rotation
                     }
                 viewModel.setDisplayRotation(displayRotation)
@@ -514,6 +511,7 @@ private fun TripSection(uiState: CompassUiState, viewModel: MainViewModel, newSe
 
 @Composable
 private fun SkyScannerSection(uiState: CompassUiState, viewModel: MainViewModel) {
+    var showConstellationPicker by remember { mutableStateOf(false) }
     AppCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Sky scanner", style = MaterialTheme.typography.titleLarge)
@@ -532,6 +530,11 @@ private fun SkyScannerSection(uiState: CompassUiState, viewModel: MainViewModel)
                 }
                 Text(uiState.skyState.status, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Button(onClick = { showConstellationPicker = true }) {
+                Text(
+                    "Constellations ${uiState.skyState.enabledConstellationIds.size}/${uiState.skyState.constellationOptions.size}"
+                )
+            }
             if (uiState.skyState.useCamera && uiState.skyState.cameraPermissionGranted) {
                 CameraPreview()
             } else {
@@ -543,6 +546,52 @@ private fun SkyScannerSection(uiState: CompassUiState, viewModel: MainViewModel)
             }
         }
     }
+    if (showConstellationPicker) {
+        ConstellationPickerDialog(
+            skyState = uiState.skyState,
+            onSetAll = viewModel::setAllConstellationsEnabled,
+            onSetConstellation = viewModel::setConstellationEnabled,
+            onDismiss = { showConstellationPicker = false }
+        )
+    }
+}
+
+@Composable
+private fun ConstellationPickerDialog(
+    skyState: SkyUiState,
+    onSetAll: (Boolean) -> Unit,
+    onSetConstellation: (String, Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val allChecked = skyState.constellationOptions.isNotEmpty() &&
+        skyState.enabledConstellationIds.size == skyState.constellationOptions.size
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Visible constellations") },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = allChecked, onCheckedChange = onSetAll)
+                    Text("All")
+                }
+                LazyColumn(modifier = Modifier.fillMaxWidth().height(360.dp)) {
+                    items(skyState.constellationOptions, key = { it.id }) { option ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = option.id in skyState.enabledConstellationIds,
+                                onCheckedChange = { enabled -> onSetConstellation(option.id, enabled) }
+                            )
+                            Text(option.name)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+    )
 }
 
 @Composable
@@ -575,11 +624,55 @@ private fun RedSkyMap(skyState: SkyUiState) {
             .border(1.dp, Color(0x55FF6A6A), RoundedCornerShape(12.dp))
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
+            fun project(azimuthDegrees: Double, altitudeDegrees: Double): Offset {
+                val centeredAzimuth = (azimuthDegrees + 180.0) % 360.0
+                val x = size.width * (centeredAzimuth / 360.0).toFloat()
+                val y = size.height * (1f - ((altitudeDegrees + 10.0) / 100.0).toFloat().coerceIn(0f, 1f))
+                return Offset(x, y)
+            }
+
+            val constellationColor = Color(0xCCFF6A6A)
+            val labelPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(255, 167, 167)
+                textSize = 12.dp.toPx()
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            skyState.constellationOverlays.forEach { constellation ->
+                val pointsById = constellation.points.associateBy { it.id }
+                constellation.lines.forEach { line ->
+                    val from = pointsById[line.fromPointId]
+                    val to = pointsById[line.toPointId]
+                    if (from != null && to != null && from.altitudeDegrees >= -10.0 && to.altitudeDegrees >= -10.0) {
+                        val start = project(from.azimuthDegrees, from.altitudeDegrees)
+                        val end = project(to.azimuthDegrees, to.altitudeDegrees)
+                        if (kotlin.math.abs(start.x - end.x) <= size.width / 2f) {
+                            drawLine(constellationColor, start, end, 2.dp.toPx(), StrokeCap.Round)
+                        }
+                    }
+                }
+                val visiblePoints = constellation.points.filter { it.altitudeDegrees >= -10.0 }
+                visiblePoints.forEach { point ->
+                    drawCircle(Color(0xFFFFD0D0), 4.dp.toPx(), project(point.azimuthDegrees, point.altitudeDegrees))
+                }
+                if (skyState.enabledConstellationIds.size <= 12 || skyState.searchQuery.isNotBlank()) {
+                    visiblePoints.maxByOrNull { it.altitudeDegrees }?.let { anchor ->
+                        val labelAt = project(anchor.azimuthDegrees, anchor.altitudeDegrees)
+                        drawContext.canvas.nativeCanvas.drawText(
+                            constellation.name,
+                            labelAt.x + 7.dp.toPx(),
+                            labelAt.y - 7.dp.toPx(),
+                            labelPaint
+                        )
+                    }
+                }
+            }
             val visible = skyState.visibleObjects.take(10)
             visible.forEachIndexed { index, skyObject ->
-                val x = size.width * ((skyObject.azimuthDegrees / 360.0).toFloat())
-                val y = size.height * (1f - ((skyObject.altitudeDegrees + 10) / 100.0).toFloat().coerceIn(0f, 1f))
-                drawCircle(color = if (skyObject.type == "Moon") Color.White else Color(0xFFFF7D7D), radius = if (index == 0) 8f else 5f, center = Offset(x, y))
+                drawCircle(
+                    color = if (skyObject.type == "Moon") Color.White else Color(0xFFFF7D7D),
+                    radius = if (index == 0) 8f else 5f,
+                    center = project(skyObject.azimuthDegrees, skyObject.altitudeDegrees)
+                )
             }
             drawCircle(color = Color(0x44FFFFFF), radius = 18f, center = center, style = Stroke(width = 2f))
             drawLine(color = Color(0x66FFFFFF), start = Offset(center.x, 0f), end = Offset(center.x, size.height))
@@ -616,13 +709,10 @@ private fun AdvancedSection(uiState: CompassUiState, viewModel: MainViewModel) {
             Text("Clinometer ${"%.1f".format(clinometer)}°")
             Text("Coordinates copy ${uiState.coordinatesText}")
             Text("Back bearing ${uiState.headingSample.magneticHeading?.let { CompassMath.normalizeDegrees(it + 180f).toInt() } ?: "--"}°")
-            point?.let {
-                val waypoint = Waypoint("Saved waypoint", it.latitude, it.longitude)
-                val active = uiState.activeTrip?.points?.lastOrNull()
-                if (active != null) {
-                    val distanceBearing = CompassMath.distanceAndBearingToWaypoint(active, waypoint)
-                    Text("Waypoint ${CompassMath.metersToDistanceText(distanceBearing.distanceMeters, uiState.settings.units)} at ${distanceBearing.bearingDegrees.toInt()}°")
-                }
+            point?.let { active ->
+                val waypoint = Waypoint("Saved waypoint", active.latitude, active.longitude)
+                val distanceBearing = CompassMath.distanceAndBearingToWaypoint(active, waypoint)
+                Text("Waypoint ${CompassMath.metersToDistanceText(distanceBearing.distanceMeters, uiState.settings.units)} at ${distanceBearing.bearingDegrees.toInt()}°")
             }
             TextButton(onClick = viewModel::deleteAllData) { Text("Delete all local data") }
         }

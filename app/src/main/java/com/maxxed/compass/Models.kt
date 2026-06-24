@@ -33,7 +33,8 @@ data class AppSettings(
     val nightMode: Boolean = false,
     val keepScreenOn: Boolean = false,
     val smoothing: Float = 0.18f,
-    val calibrationNagDismissed: Boolean = false
+    val calibrationNagDismissed: Boolean = false,
+    val hiddenConstellationIds: Set<String> = emptySet()
 )
 
 data class HeadingSample(
@@ -133,11 +134,38 @@ data class SkyObject(
     val description: String
 )
 
+data class SkyPoint(
+    val id: String,
+    val name: String,
+    val azimuthDegrees: Double,
+    val altitudeDegrees: Double
+)
+
+data class SkyLine(
+    val fromPointId: String,
+    val toPointId: String
+)
+
+data class ConstellationOverlay(
+    val id: String,
+    val name: String,
+    val points: List<SkyPoint>,
+    val lines: List<SkyLine>
+)
+
+data class ConstellationOption(
+    val id: String,
+    val name: String
+)
+
 data class SkyUiState(
     val useCamera: Boolean = false,
     val searchQuery: String = "",
     val nearestObject: SkyObject? = null,
     val visibleObjects: List<SkyObject> = emptyList(),
+    val constellationOverlays: List<ConstellationOverlay> = emptyList(),
+    val constellationOptions: List<ConstellationOption> = emptyList(),
+    val enabledConstellationIds: Set<String> = emptySet(),
     val status: String = "Location and orientation needed",
     val cameraPermissionGranted: Boolean = false
 )

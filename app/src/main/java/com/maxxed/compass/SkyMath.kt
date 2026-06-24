@@ -1,11 +1,15 @@
 package com.maxxed.compass
 
-import kotlin.math.PI
+import android.content.Context
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -18,6 +22,70 @@ private data class CatalogBody(
     val description: String
 )
 
+data class EquatorialSkyPoint(
+    val rightAscensionHours: Double,
+    val declinationDegrees: Double
+)
+
+data class EquatorialConstellation(
+    val id: String,
+    val name: String,
+    val polylines: List<List<EquatorialSkyPoint>>
+)
+
+object ConstellationCatalog {
+    fun load(context: Context): List<EquatorialConstellation> {
+        val linesJson = context.resources.openRawResource(R.raw.constellation_lines)
+            .bufferedReader().use { it.readText() }
+        val namesJson = context.resources.openRawResource(R.raw.constellation_names)
+            .bufferedReader().use { it.readText() }
+        return parse(linesJson, namesJson)
+    }
+
+    fun parse(linesJson: String, namesJson: String): List<EquatorialConstellation> {
+        val json = Json { ignoreUnknownKeys = true }
+        val names = json.parseToJsonElement(namesJson).jsonObject["features"]!!.jsonArray
+            .associate { feature ->
+                val objectValue = feature.jsonObject
+                val id = objectValue["id"]!!.jsonPrimitive.content
+                val name = objectValue["properties"]!!.jsonObject["name"]!!.jsonPrimitive.content
+                id to name
+            }
+            .toMutableMap()
+            .apply { this["Ser"] = "Serpens" }
+
+        val groupedPolylines = linkedMapOf<String, MutableList<List<EquatorialSkyPoint>>>()
+        json.parseToJsonElement(linesJson).jsonObject["features"]!!.jsonArray.forEach { feature ->
+            val objectValue = feature.jsonObject
+            val id = objectValue["id"]!!.jsonPrimitive.content
+            val coordinates = objectValue["geometry"]!!.jsonObject["coordinates"]!!.jsonArray
+            val target = groupedPolylines.getOrPut(id) { mutableListOf() }
+            coordinates.forEach { polyline ->
+                target += polyline.jsonArray.map { coordinate ->
+                    val pair = coordinate.jsonArray
+                    val rightAscensionDegrees = pair[0].jsonPrimitive.double
+                    EquatorialSkyPoint(
+                        rightAscensionHours = normalizeDegrees(rightAscensionDegrees) / 15.0,
+                        declinationDegrees = pair[1].jsonPrimitive.double
+                    )
+                }
+            }
+        }
+
+        return groupedPolylines.map { (id, polylines) ->
+            EquatorialConstellation(
+                id = id,
+                name = names[id] ?: id,
+                polylines = polylines
+            )
+        }.sortedBy { it.name }
+    }
+
+    private fun normalizeDegrees(value: Double): Double {
+        val normalized = value % 360.0
+        return if (normalized < 0.0) normalized + 360.0 else normalized
+    }
+}
 object SkyMath {
     private val starCatalog = listOf(
         CatalogBody("polaris", "Polaris", "Star", 2.5303, 89.2641, "North Star used for reliable north guidance."),
@@ -29,12 +97,6 @@ object SkyMath {
         CatalogBody("deneb", "Deneb", "Star", 20.6905, 45.2803, "Summer Triangle star in Cygnus.")
     )
 
-    private val constellations = listOf(
-        CatalogBody("orion", "Orion", "Constellation", 5.5, 0.0, "Prominent winter constellation with belt stars."),
-        CatalogBody("ursa_major", "Ursa Major", "Constellation", 11.0, 55.0, "Contains the Big Dipper asterism."),
-        CatalogBody("cassiopeia", "Cassiopeia", "Constellation", 1.0, 60.0, "W-shaped northern constellation.")
-    )
-
     private val planets = listOf(
         CatalogBody("mercury", "Mercury", "Planet", 7.0, 12.0, "Inner planet with fast-changing position."),
         CatalogBody("venus", "Venus", "Planet", 9.5, 15.0, "Very bright inner planet often near twilight."),
@@ -43,14 +105,52 @@ object SkyMath {
         CatalogBody("saturn", "Saturn", "Planet", 22.0, -12.0, "Ringed planet with a steady golden appearance.")
     )
 
-    fun visibleObjects(timeMillis: Long, latitude: Double, longitude: Double): List<SkyObject> {
+    fun visibleObjects(
+        timeMillis: Long,
+        latitude: Double,
+        longitude: Double,
+        constellations: List<EquatorialConstellation> = emptyList()
+    ): List<SkyObject> {
         val all = buildList {
             addAll(starCatalog.map { toSkyObject(it, timeMillis, latitude, longitude) })
-            addAll(constellations.map { toSkyObject(it, timeMillis, latitude, longitude) })
+            addAll(constellations.map { constellationGuide(it, timeMillis, latitude, longitude) })
             addAll(planets.map { toSkyObject(shiftPlanet(it, timeMillis), timeMillis, latitude, longitude) })
             add(moon(timeMillis, latitude, longitude))
         }
         return all.sortedByDescending { it.altitudeDegrees }
+    }
+
+    fun constellationOverlays(
+        constellations: List<EquatorialConstellation>,
+        timeMillis: Long,
+        latitude: Double,
+        longitude: Double
+    ): List<ConstellationOverlay> {
+        return constellations.mapNotNull { constellation ->
+            val points = mutableListOf<SkyPoint>()
+            val lines = mutableListOf<SkyLine>()
+            constellation.polylines.forEachIndexed { lineIndex, polyline ->
+                polyline.forEachIndexed { pointIndex, point ->
+                    val id = "${constellation.id}_${lineIndex}_${pointIndex}"
+                    val altAz = equatorialToHorizontal(
+                        point.rightAscensionHours,
+                        point.declinationDegrees,
+                        timeMillis,
+                        latitude,
+                        longitude
+                    )
+                    points += SkyPoint(id, "", altAz.first, altAz.second)
+                    if (pointIndex > 0) {
+                        lines += SkyLine(
+                            fromPointId = "${constellation.id}_${lineIndex}_${pointIndex - 1}",
+                            toPointId = id
+                        )
+                    }
+                }
+            }
+            if (points.none { it.altitudeDegrees >= -10.0 }) return@mapNotNull null
+            ConstellationOverlay(constellation.id, constellation.name, points, lines)
+        }
     }
 
     fun nearestToCenter(objects: List<SkyObject>, azimuth: Double, altitude: Double): SkyObject? {
@@ -61,8 +161,29 @@ object SkyMath {
 
     fun polarisGuidance(objects: List<SkyObject>): String {
         val polaris = objects.firstOrNull { it.id == "polaris" } ?: return "Polaris not visible from this hemisphere/time."
-        val altitudeRounded = polaris.altitudeDegrees.roundToInt()
-        return "Polaris near ${polaris.azimuthDegrees.roundToInt()}° azimuth and ${altitudeRounded}° altitude."
+        return "Polaris near ${polaris.azimuthDegrees.roundToInt()}° azimuth and ${polaris.altitudeDegrees.roundToInt()}° altitude."
+    }
+
+    private fun constellationGuide(
+        constellation: EquatorialConstellation,
+        timeMillis: Long,
+        latitude: Double,
+        longitude: Double
+    ): SkyObject {
+        val points = constellation.polylines.flatten()
+        val x = points.sumOf { cos(Math.toRadians(it.rightAscensionHours * 15.0)) }
+        val y = points.sumOf { sin(Math.toRadians(it.rightAscensionHours * 15.0)) }
+        val raHours = normalizeDegrees(Math.toDegrees(atan2(y, x))) / 15.0
+        val declination = points.map { it.declinationDegrees }.average()
+        val altAz = equatorialToHorizontal(raHours, declination, timeMillis, latitude, longitude)
+        return SkyObject(
+            constellation.id,
+            constellation.name,
+            "Constellation",
+            altAz.first,
+            altAz.second,
+            "Calculated line figure from the complete Western constellation catalog."
+        )
     }
 
     private fun toSkyObject(body: CatalogBody, timeMillis: Long, latitude: Double, longitude: Double): SkyObject {
@@ -88,7 +209,10 @@ object SkyMath {
             "saturn" -> 2.0
             else -> 0.0
         }
-        return body.copy(raHours = if (adjustedRa < 0) adjustedRa + 24.0 else adjustedRa, decDegrees = adjustedDec.coerceIn(-28.0, 28.0))
+        return body.copy(
+            raHours = if (adjustedRa < 0) adjustedRa + 24.0 else adjustedRa,
+            decDegrees = adjustedDec.coerceIn(-28.0, 28.0)
+        )
     }
 
     private fun moon(timeMillis: Long, latitude: Double, longitude: Double): SkyObject {
@@ -99,7 +223,13 @@ object SkyMath {
         return SkyObject("moon", "Moon", "Moon", altAz.first, altAz.second, "Calculated lunar position for field identification.")
     }
 
-    private fun equatorialToHorizontal(raHours: Double, decDegrees: Double, timeMillis: Long, latitude: Double, longitude: Double): Pair<Double, Double> {
+    private fun equatorialToHorizontal(
+        raHours: Double,
+        decDegrees: Double,
+        timeMillis: Long,
+        latitude: Double,
+        longitude: Double
+    ): Pair<Double, Double> {
         val lst = localSiderealTime(timeMillis, longitude)
         val hourAngle = Math.toRadians((lst - raHours) * 15.0)
         val latRad = Math.toRadians(latitude)
@@ -115,7 +245,8 @@ object SkyMath {
     private fun localSiderealTime(timeMillis: Long, longitude: Double): Double {
         val jd = timeMillis / 86_400_000.0 + 2440587.5
         val t = (jd - 2451545.0) / 36525.0
-        val gst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * t * t - t * t * t / 38710000.0
+        val gst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) +
+            0.000387933 * t * t - t * t * t / 38710000.0
         return ((gst + longitude) / 15.0).let {
             val wrapped = it % 24.0
             if (wrapped < 0) wrapped + 24.0 else wrapped
@@ -130,8 +261,7 @@ object SkyMath {
     }
 
     private fun normalizeDegrees(value: Double): Double {
-        var normalized = value % 360.0
-        if (normalized < 0.0) normalized += 360.0
-        return normalized
+        val normalized = value % 360.0
+        return if (normalized < 0.0) normalized + 360.0 else normalized
     }
 }
