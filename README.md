@@ -52,4 +52,4 @@ The verifier checks APK and AAB signatures, compares the APK signer when an expe
 
 ## Release Status
 
-See `RELEASE_READINESS.json` for the machine-readable status and `docs/PHYSICAL_TEST_PLAN.md` for the required Samsung S22 Ultra acceptance run. A release is not READY until every pending physical and artifact check has recorded evidence.
+See `RELEASE_READINESS.json` for the machine-readable status, `docs/RELEASE_CHECKLIST.md` for current progress, and `docs/PHYSICAL_TEST_PLAN.md` for the required Samsung S22 Ultra acceptance run. A release is not READY until every pending physical and artifact check has recorded evidence.

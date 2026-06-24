@@ -4,13 +4,15 @@
   "evaluated_on": "2026-06-23",
   "overall_status": "NOT_READY",
   "source": {
-    "kotlin_warning_cleanup": "implemented_not_compiled_in_current_runner",
+    "kotlin_warning_cleanup": "pass_compiled_without_kotlin_warnings",
     "process_recovery_hardening": "implemented_not_device_verified",
-    "all_88_selectable_constellations": "implemented_not_compiled_or_device_verified",
+    "all_88_selectable_constellations": "compiled_basic_ui_visible_on_s22_full_behavior_pending",
     "constellation_catalog_unique_ids": "verified_88_in_bundled_json",
     "release_debug_key_fallback": "removed",
-    "unit_tests": "not_run_no_android_sdk_or_gradle_distribution",
-    "lint_release": "not_run_no_android_sdk_or_gradle_distribution"
+    "unit_tests": "pass_13_tests",
+    "lint_debug": "pass",
+    "assemble_debug": "pass",
+    "lint_release": "not_run"
   },
   "physical_tests": {
     "heading_accuracy": "not_run",
@@ -19,11 +21,12 @@
     "notification_actions": "not_run",
     "process_recovery": "not_run",
     "lock_screen_display": "not_run",
-    "sky_scanner": "not_run",
+    "sky_scanner": "partial_basic_constellation_ui_visible_full_accuracy_and_persistence_pending",
     "outdoor_distance_10_to_20_minutes": "not_run",
     "outdoor_battery_10_to_20_minutes": "not_run"
   },
   "release_artifacts": {
+    "debug_apk": "built",
     "signed_apk": "not_built",
     "signed_aab": "not_built",
     "apk_sha256": null,
@@ -34,9 +37,9 @@
     "non_debuggable_manifest": "not_run"
   },
   "publication": {
-    "implementation_commit": "not_created",
-    "release_finalization_commit": "not_created",
-    "push_to_main": "failed_read_only_github_integration"
+    "implementation_commit": "pending_confirmation",
+    "release_finalization_commit": "pending_confirmation",
+    "push_to_main": "pending_confirmation"
   },
   "privacy_and_store": {
     "privacy_disclosure": "drafted",
@@ -49,11 +52,10 @@
     "screenshots": "not_verified"
   },
   "exact_release_failures": [
-    "The current runner has no Android SDK and cannot download Gradle 8.9 because the distribution request returns HTTP 403.",
-    "No Samsung S22 Ultra or adb executable is available to this runner, so required physical tests were not executed.",
     "No release keystore or expected certificate digest was provided to this runner, so signed APK/AAB artifacts and signer identity were not verified.",
     "A public privacy-policy URL, confirmed support email, feature graphic, and signed-release screenshots are not verified.",
-    "GitHub rejected repository-content writes with HTTP 403 Resource not accessible by integration, so the requested commits were not pushed."
+    "Required indoor workflow tests and the 10-20 minute outdoor heading, distance, sky-direction, and battery tests are incomplete.",
+    "GitHub commits and push to main have not been confirmed in this release record."
   ],
   "ready_when": "All source checks compile and pass, every physical test is pass with evidence, signed APK/AAB verification passes against the expected certificate, hashes are recorded, and privacy/store materials are complete."
 }
