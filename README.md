@@ -29,26 +29,17 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Signed Release
 
-Create an ignored properties file outside the repository:
-
-```properties
-storeFile=/absolute/path/to/upload-key.jks
-storePassword=REDACTED
-keyAlias=upload
-keyPassword=REDACTED
-```
-
-Build and verify:
-
-```bash
-export MAXXED_RELEASE_PROPERTIES=/absolute/path/to/release.properties
-./gradlew clean testDebugUnitTest lintRelease assembleRelease bundleRelease
-chmod +x scripts/verify-release.sh
-MAXXED_EXPECTED_CERT_SHA256=YOUR_EXPECTED_CERT_DIGEST \
-  scripts/verify-release.sh
-```
+Create an ignored local release properties file outside the repository, then run the signed-release build and verifier described in `docs/RELEASE_CHECKLIST.md`.
 
 The verifier checks APK and AAB signatures, compares the APK signer when an expected digest is supplied, rejects a debuggable release APK, and writes SHA-256 hashes under `release/verification/`.
+
+## Store And Disclosure Materials
+
+Current release-polish materials live under `docs/`:
+
+- `docs/PLAY_STORE_LISTING.md`: Play Store title, descriptions, release notes, screenshot checklist, and copy guardrails.
+- `docs/PLAY_DISCLOSURE_CHECKLIST.md`: Play Console declaration checklist for local-first Compass behavior.
+- `docs/RELEASE_EVIDENCE_TEMPLATE.md`: final acceptance evidence template for signed artifacts, device testing, store assets, and release decision.
 
 ## Release Status
 
