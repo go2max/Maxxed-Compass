@@ -1,6 +1,6 @@
 # Maxxed Compass Release Checklist
 
-Updated: June 23, 2026
+Updated: June 25, 2026
 
 ## Source And Build
 
@@ -11,11 +11,12 @@ Updated: June 23, 2026
 - [x] All 88 unique constellations bundled offline with required attribution
 - [x] All constellations enabled by default with persistent individual checkboxes and an All control
 - [x] Constellation calculations throttled for battery use
-- [x] Unit tests pass: 13 tests
-- [x] Debug lint passes
-- [x] Debug APK assembles successfully
-- [x] Updated debug APK installed on Samsung Galaxy S22 Ultra
-- [x] Constellation controls are visible on the S22 Ultra
+- [x] Unit tests pass: 13 tests in prior run
+- [x] Debug lint passes in prior run
+- [x] Debug APK assembles successfully in prior run
+- [x] Updated debug APK installed on Samsung Galaxy S22 Ultra in prior run
+- [x] Constellation controls are visible on the S22 Ultra in prior run
+- [ ] Re-run unit tests, debug lint, release lint, debug build, signed APK, and signed AAB for the final release candidate
 
 ## Indoor Device Acceptance
 
@@ -49,17 +50,20 @@ Updated: June 23, 2026
 - [ ] Verify signer matches the expected certificate
 - [ ] Verify release manifest is non-debuggable
 - [ ] Record final APK and AAB SHA-256 hashes
+- [x] Add release evidence template: `docs/RELEASE_EVIDENCE_TEMPLATE.md`
 
 ## Play Store
 
-- [ ] Publish the privacy-policy URL
-- [ ] Confirm support email
+- [x] Draft Play Store listing copy: `docs/PLAY_STORE_LISTING.md`
+- [x] Draft Play disclosure checklist: `docs/PLAY_DISCLOSURE_CHECKLIST.md`
+- [x] Publishable privacy-policy URL identified: `https://techmaxxed.com/apps/maxxed-compass/privacy/`
+- [ ] Confirm support email mailbox is active: `support@techmaxxed.com`
 - [ ] Verify production 512 x 512 icon
 - [ ] Create and verify 1024 x 500 feature graphic
 - [ ] Capture signed-release phone screenshots
-- [ ] Complete Data Safety and permission declarations
-- [ ] Review background-location and boot-recovery declarations
-- [ ] Finalize store listing and release notes
+- [ ] Complete Data Safety and permission declarations in Play Console
+- [ ] Review background-location and boot-recovery declarations against the signed artifact
+- [ ] Finalize store listing and release notes in Play Console
 
 ## Publication
 
@@ -68,4 +72,4 @@ Updated: June 23, 2026
 - [ ] Push both commits to `origin/main`
 - [ ] Confirm clean working tree and remote commit IDs
 
-Release status: **NOT READY** until every required item above is checked and evidence is recorded.
+Release status: **NOT READY** until every required physical, signed-artifact, store-console, and evidence item above is checked and evidence is recorded.
