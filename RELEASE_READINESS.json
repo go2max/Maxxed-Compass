@@ -1,7 +1,7 @@
 {
   "project": "Maxxed Compass",
   "baseline_commit": "4011abc7d169e36b48ac78bceeb7d25f246b370b",
-  "evaluated_on": "2026-06-23",
+  "evaluated_on": "2026-06-25",
   "overall_status": "NOT_READY",
   "source": {
     "kotlin_warning_cleanup": "pass_compiled_without_kotlin_warnings",
@@ -9,10 +9,10 @@
     "all_88_selectable_constellations": "compiled_basic_ui_visible_on_s22_full_behavior_pending",
     "constellation_catalog_unique_ids": "verified_88_in_bundled_json",
     "release_debug_key_fallback": "removed",
-    "unit_tests": "pass_13_tests",
-    "lint_debug": "pass",
-    "assemble_debug": "pass",
-    "lint_release": "not_run"
+    "unit_tests": "pass_13_tests_prior_run",
+    "lint_debug": "pass_prior_run",
+    "assemble_debug": "pass_prior_run",
+    "lint_release": "not_run_in_this_environment"
   },
   "physical_tests": {
     "heading_accuracy": "not_run",
@@ -26,7 +26,7 @@
     "outdoor_battery_10_to_20_minutes": "not_run"
   },
   "release_artifacts": {
-    "debug_apk": "built",
+    "debug_apk": "built_prior_run",
     "signed_apk": "not_built",
     "signed_aab": "not_built",
     "apk_sha256": null,
@@ -37,25 +37,28 @@
     "non_debuggable_manifest": "not_run"
   },
   "publication": {
-    "implementation_commit": "pending_confirmation",
-    "release_finalization_commit": "pending_confirmation",
-    "push_to_main": "pending_confirmation"
+    "implementation_commit": "pending_final_confirmation",
+    "release_finalization_commit": "pending_final_confirmation",
+    "push_to_main": "pending_final_confirmation"
   },
   "privacy_and_store": {
     "privacy_disclosure": "drafted",
+    "play_disclosure_checklist": "drafted",
     "play_data_safety": "drafted_not_console_verified",
     "no_internet_permission": "verified_in_source_manifest",
     "store_listing": "drafted",
-    "privacy_policy_url": "missing",
-    "support_email": "missing",
-    "feature_graphic": "not_verified",
-    "screenshots": "not_verified"
+    "privacy_policy_url": "https://techmaxxed.com/apps/maxxed-compass/privacy/",
+    "support_email": "support@techmaxxed.com_pending_mailbox_verification",
+    "feature_graphic": "required_not_verified",
+    "screenshots": "signed_release_screenshots_required_not_verified",
+    "release_evidence_template": "created"
   },
   "exact_release_failures": [
     "No release keystore or expected certificate digest was provided to this runner, so signed APK/AAB artifacts and signer identity were not verified.",
-    "A public privacy-policy URL, confirmed support email, feature graphic, and signed-release screenshots are not verified.",
+    "Signed-release screenshots, the 1024 x 500 feature graphic, and final Play Console entries are not verified.",
     "Required indoor workflow tests and the 10-20 minute outdoor heading, distance, sky-direction, and battery tests are incomplete.",
+    "Support mailbox activation and final privacy/store console verification still need confirmation.",
     "GitHub commits and push to main have not been confirmed in this release record."
   ],
-  "ready_when": "All source checks compile and pass, every physical test is pass with evidence, signed APK/AAB verification passes against the expected certificate, hashes are recorded, and privacy/store materials are complete."
+  "ready_when": "All source checks compile and pass, every physical test is pass with evidence, signed APK/AAB verification passes against the expected certificate, hashes are recorded, support and privacy links are verified live, and Play Store materials are complete."
 }
