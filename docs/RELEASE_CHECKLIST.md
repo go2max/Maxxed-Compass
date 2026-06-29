@@ -1,6 +1,15 @@
 # Maxxed Compass Release Checklist
 
-Updated: June 25, 2026
+Updated: June 29, 2026
+
+## Launch-Today MVP Scope
+
+- [x] Foreground/local-first compass, trip tracker, and Sky Scanner posture selected for the first Play submission
+- [x] Background-location permission removed from the MVP manifest
+- [x] Boot-completed receiver removed from the MVP manifest
+- [x] Play disclosure checklist updated to avoid background-location and boot-recovery claims
+- [ ] Re-run final build checks against this branch before upload
+- [ ] Confirm the signed artifact manifest matches the foreground MVP posture
 
 ## Source And Build
 
@@ -18,25 +27,28 @@ Updated: June 25, 2026
 - [x] Constellation controls are visible on the S22 Ultra in prior run
 - [ ] Re-run unit tests, debug lint, release lint, debug build, signed APK, and signed AAB for the final release candidate
 
-## Indoor Device Acceptance
+## Fast Device Acceptance For Same-Day Internal Release
 
-- [ ] Confirm picker reports 88/88 and All is checked by default
-- [ ] Disable All, enable several constellations, and confirm only selected line figures render
-- [ ] Restart the app and confirm constellation selections persist
-- [ ] Confirm camera permission denial, grant, preview, and red-map switching
-- [ ] Confirm trip Start, Pause, Resume, and Stop from both app and notification
+- [ ] Install signed release build on Samsung Galaxy S22 Ultra
+- [ ] Confirm app opens cleanly from launcher
+- [ ] Confirm compass heading updates and calibration/interference messaging is visible
+- [ ] Confirm true-north mode shows declination when location is granted
+- [ ] Confirm trip Start, Pause, Resume, and Stop from inside the app
+- [ ] Confirm foreground tracking notification appears during an active trip
 - [ ] Confirm stopped trip appears once in history and persists after restart
-- [ ] Confirm active and paused trip recovery after process termination
-- [ ] Confirm lock-screen display and Keep Screen On behavior
+- [ ] Confirm camera permission denial, grant, preview, and red-map switching
+- [ ] Confirm picker reports 88/88 and All is checked by default
+- [ ] Disable All, enable several constellations, and confirm selected line figures render
+- [ ] Restart the app and confirm settings and constellation selections persist
 - [ ] Confirm theme, units, night mode, history rename, deletion, and delete-all behavior
 
 ## Outdoor Acceptance
 
 - [ ] Verify magnetic heading at north, east, south, and west
 - [ ] Verify true north and displayed declination
-- [ ] Verify Polaris, Moon, and one constellation against a trusted sky reference
+- [ ] Verify Polaris, Moon, or one constellation against a trusted sky reference
 - [ ] Complete a 10-20 minute known-distance walk
-- [ ] Confirm screen-off tracking, pause exclusion, GPS filtering, and final distance
+- [ ] Confirm pause exclusion, GPS filtering, and final distance while the app/foreground service is active
 - [ ] Record starting/final battery and confirm no thermal warning
 
 ## Release Artifacts
@@ -49,6 +61,8 @@ Updated: June 25, 2026
 - [ ] Verify APK and AAB signatures
 - [ ] Verify signer matches the expected certificate
 - [ ] Verify release manifest is non-debuggable
+- [ ] Verify release manifest does not include `ACCESS_BACKGROUND_LOCATION`
+- [ ] Verify release manifest does not include `RECEIVE_BOOT_COMPLETED`
 - [ ] Record final APK and AAB SHA-256 hashes
 - [x] Add release evidence template: `docs/RELEASE_EVIDENCE_TEMPLATE.md`
 
@@ -62,7 +76,7 @@ Updated: June 25, 2026
 - [ ] Create and verify 1024 x 500 feature graphic
 - [ ] Capture signed-release phone screenshots
 - [ ] Complete Data Safety and permission declarations in Play Console
-- [ ] Review background-location and boot-recovery declarations against the signed artifact
+- [ ] Verify Play declarations do not claim background location or boot recovery for this MVP
 - [ ] Finalize store listing and release notes in Play Console
 
 ## Publication
@@ -72,4 +86,4 @@ Updated: June 25, 2026
 - [ ] Push both commits to `origin/main`
 - [ ] Confirm clean working tree and remote commit IDs
 
-Release status: **NOT READY** until every required physical, signed-artifact, store-console, and evidence item above is checked and evidence is recorded.
+Release status: **NOT READY** until final build, signed-artifact verification, required device acceptance, and Play Console evidence are recorded.
